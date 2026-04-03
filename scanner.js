@@ -2,7 +2,7 @@ import axios from "axios"
 
 export async function scanTokens() {
   try {
-    const res = await axios.get("https://api.dexscreener.com/latest/dex/pairs/solana", {
+    const res = await axios.get("https://api.dexscreener.com/latest/dex/search/?q=solana", {
       headers: {
         "User-Agent": "Mozilla/5.0"
       }
