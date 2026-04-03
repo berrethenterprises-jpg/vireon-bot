@@ -2,7 +2,11 @@ import axios from "axios"
 
 export async function scanTokens() {
   try {
-    const res = await axios.get("https://api.dexscreener.com/latest/dex/pairs/solana")
+    const res = await axios.get("https://api.dexscreener.com/latest/dex/pairs/solana", {
+      headers: {
+        "User-Agent": "Mozilla/5.0"
+      }
+    })
 
     const pairs = res.data.pairs || []
 
@@ -10,7 +14,7 @@ export async function scanTokens() {
 
     return pairs.slice(0, 50)
   } catch (err) {
-    console.log("SCAN ERROR:", err.message)
+    console.log("SCAN ERROR:", err.response?.status || err.message)
     return []
   }
 }
