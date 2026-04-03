@@ -1,4 +1,4 @@
-console.log("🚀 VIREON v9.3 FINAL UNLOCK ACTIVE")
+console.log("🚀 VIREON v9.4 VISIBILITY + FILTER FIX")
 
 import { scanTokens } from "./scanner.js"
 import { getBalance, getPositions, openPosition, closePosition, cleanPositions } from "./paperTrader.js"
@@ -17,6 +17,17 @@ function getLivePrice(address, tokens) {
   return t?.priceUsd || null
 }
 
+function isBaseToken(symbol) {
+  const s = symbol.toUpperCase()
+
+  return (
+    s.includes("SOL") ||
+    s.includes("USD") ||
+    s.includes("ETH") ||
+    s.includes("BTC")
+  )
+}
+
 async function runBot() {
   while (true) {
     const tokens = await scanTokens()
@@ -24,23 +35,22 @@ async function runBot() {
     console.log("TOKENS RECEIVED:", tokens.length)
 
     for (let token of tokens) {
-      const symbol = token.baseToken?.symbol
-      if (!symbol) continue
-
-      const banned = ["SOL", "SOLANA", "USDC", "USDT", "ETH", "BTC"]
-      if (banned.includes(symbol)) continue
-
+      const symbol = token.baseToken?.symbol || "UNKNOWN"
       const liquidity = token.liquidity?.usd || 0
 
+      // 🔥 ALWAYS LOG FIRST (CRITICAL)
+      console.log("RAW TOKEN:", symbol, "| LIQ:", liquidity)
+
+      // 🚫 FILTER BASE TOKENS (FUZZY)
+      if (isBaseToken(symbol)) continue
+
+      // 🚫 LIQUIDITY FILTER
       if (liquidity < 1000) continue
       if (liquidity > 5_000_000) continue
 
-      // 🔥 LOG EVERYTHING THAT PASSES FILTER
       console.log("SCANNING:", symbol, "| LIQ:", liquidity)
 
-      // 🔥 ONLY REQUIRE PRICE WHEN ENTERING
       if (!token.priceUsd) continue
-
       if (!shouldEnter(token)) continue
 
       if (getPositions().length >= CONFIG.MAX_OPEN_TRADES) continue
