@@ -1,4 +1,4 @@
-console.log("🚀 VIREON v9.5 REAL TOKEN FIX ACTIVE")
+console.log("🚀 VIREON v9.6 LIVE")
 
 import { scanTokens } from "./scanner.js"
 import { getBalance, getPositions, openPosition, closePosition, cleanPositions } from "./paperTrader.js"
@@ -12,7 +12,7 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-// 🔥 GET THE ACTUAL MEMECOIN (NOT SOL/USDC)
+// ✅ SMART TOKEN PICKER (FIXES USDC/SOL ISSUE)
 function getTokenSide(pair) {
   const base = pair.baseToken
   const quote = pair.quoteToken
@@ -20,27 +20,32 @@ function getTokenSide(pair) {
   const baseSymbol = base?.symbol?.toUpperCase() || ""
   const quoteSymbol = quote?.symbol?.toUpperCase() || ""
 
-  const isBaseStable =
-    baseSymbol.includes("SOL") ||
-    baseSymbol.includes("USD") ||
-    baseSymbol.includes("ETH") ||
-    baseSymbol.includes("BTC")
+  const isStable = (s) =>
+    s.includes("SOL") ||
+    s.includes("USD") ||
+    s.includes("ETH") ||
+    s.includes("BTC")
 
-  const isQuoteStable =
-    quoteSymbol.includes("SOL") ||
-    quoteSymbol.includes("USD") ||
-    quoteSymbol.includes("ETH") ||
-    quoteSymbol.includes("BTC")
+  const baseStable = isStable(baseSymbol)
+  const quoteStable = isStable(quoteSymbol)
 
-  // 🔥 choose the NON-stable side
-  if (isBaseStable && !isQuoteStable) return quote
-  if (!isBaseStable && isQuoteStable) return base
+  // Case 1: one side is stable → pick the other
+  if (baseStable && !quoteStable) return quote
+  if (!baseStable && quoteStable) return base
 
-  return base // fallback
+  // Case 2: both are stable → skip
+  if (baseStable && quoteStable) return null
+
+  // Case 3: both non-stable → default to base
+  return base
 }
 
+// ✅ GET LIVE PRICE FOR OPEN POSITIONS
 function getLivePrice(address, tokens) {
-  const t = tokens.find(t => t.baseToken.address === address)
+  const t = tokens.find(t => {
+    const token = getTokenSide(t)
+    return token?.address === address
+  })
   return t?.priceUsd || null
 }
 
@@ -52,29 +57,37 @@ async function runBot() {
 
     for (let pair of tokens) {
       const token = getTokenSide(pair)
+      if (!token) continue
 
-      const symbol = token?.symbol || "UNKNOWN"
+      const symbol = token.symbol || "UNKNOWN"
       const liquidity = pair.liquidity?.usd || 0
 
       console.log("RAW TOKEN:", symbol, "| LIQ:", liquidity)
 
-      if (!symbol) continue
-
+      // ✅ BASIC LIQUIDITY FILTER
       if (liquidity < 1000) continue
       if (liquidity > 5_000_000) continue
 
       console.log("SCANNING:", symbol)
 
+      // ✅ REQUIRE PRICE + STRATEGY
       if (!pair.priceUsd) continue
       if (!shouldEnter(pair)) continue
 
+      // ✅ POSITION LIMIT
       if (getPositions().length >= CONFIG.MAX_OPEN_TRADES) continue
+
+      // ✅ PREVENT DUPLICATES
       if (activeAddresses.has(token.address)) continue
 
-      openPosition({
-        ...pair,
-        baseToken: token
-      }, CONFIG.BASE_SIZE)
+      // ✅ OPEN TRADE
+      openPosition(
+        {
+          ...pair,
+          baseToken: token
+        },
+        CONFIG.BASE_SIZE
+      )
 
       activeAddresses.add(token.address)
 
@@ -84,6 +97,7 @@ async function runBot() {
       })
     }
 
+    // ✅ MANAGE OPEN POSITIONS
     for (let pos of getPositions()) {
       const currentPrice = getLivePrice(pos.address, tokens)
       if (!currentPrice) continue
@@ -91,7 +105,9 @@ async function runBot() {
       const elapsed = Date.now() - pos.start
 
       if (shouldExit(pos, { priceUsd: currentPrice }, elapsed)) {
-        const adjustedPrice = currentPrice * (1 - CONFIG.SLIPPAGE - CONFIG.FEE)
+        const adjustedPrice =
+          currentPrice * (1 - CONFIG.SLIPPAGE - CONFIG.FEE)
+
         const pnl = closePosition(pos, adjustedPrice)
 
         activeAddresses.delete(pos.address)
