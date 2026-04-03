@@ -1,5 +1,5 @@
-// 🚀 FORCE BUILD CONFIRMATION
-console.log("🚀 VIREON v8.8 STRONG FILTER BUILD ACTIVE")
+// 🚀 BUILD CONFIRMATION
+console.log("🚀 VIREON v8.9 BALANCED TRADING ACTIVE")
 
 import { scanTokens } from "./scanner.js"
 import { getBalance, getPositions, openPosition, closePosition, cleanPositions } from "./paperTrader.js"
@@ -30,25 +30,23 @@ async function runBot() {
       const symbol = token.baseToken?.symbol
       if (!symbol) continue
 
-      // 🔥 STRONG FILTER (FINAL VERSION)
+      // 🔥 BASE TOKEN FILTER
       const banned = ["SOL", "SOLANA", "USDC", "USDT", "ETH", "BTC"]
-
-      // skip base tokens
       if (banned.includes(symbol)) continue
 
-      // skip high liquidity (not memecoins)
       const liquidity = token.liquidity?.usd || 0
-      if (liquidity > 5_000_000) continue
 
-      // skip dead/low liquidity junk
-      if (liquidity < 5_000) continue
+      // 🔥 BALANCED FILTER (UPDATED)
+      if (liquidity < 2000) continue         // avoid dead rugs
+      if (liquidity > 2_000_000) continue    // avoid large caps
 
       console.log("SCANNING:", symbol, "| LIQ:", liquidity)
 
       const clarity = clarityIndex(token)
       const crowd = crowdScore(token)
 
-      if (!isHighQuality(token, clarity, crowd)) continue
+      // 🔥 RELAXED ENTRY CONDITIONS
+      if (clarity < 1) continue
 
       if (getPositions().length >= CONFIG.MAX_OPEN_TRADES) continue
       if (activeAddresses.has(token.baseToken.address)) continue
