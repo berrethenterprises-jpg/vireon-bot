@@ -1,45 +1,33 @@
 import axios from "axios"
 
-async function fetchPairs(url) {
-  try {
-    const res = await axios.get(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0"
-      },
-      timeout: 5000
-    })
-
-    return res.data.pairs || []
-  } catch (err) {
-    console.log("FAILED:", url)
-    return []
-  }
-}
-
 export async function scanTokens() {
   try {
-    // 🔥 TRY MULTIPLE SOURCES
-    let pairs = []
+    const res = await axios.get(
+      "https://api.dexscreener.com/latest/dex/search/?q=",
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0"
+        },
+        timeout: 5000
+      }
+    )
 
-    // Primary
-    pairs = await fetchPairs("https://api.dexscreener.com/latest/dex/search/?q=sol")
+    let pairs = res.data.pairs || []
 
-    // Fallback 1
-    if (pairs.length === 0) {
-      pairs = await fetchPairs("https://api.dexscreener.com/latest/dex/search/?q=usdc")
-    }
+    // 🔥 REMOVE SOL BASE PAIRS
+    pairs = pairs.filter(p => {
+      const symbol = p.baseToken?.symbol || ""
+      return !symbol.toUpperCase().includes("SOL")
+    })
 
-    // Fallback 2
-    if (pairs.length === 0) {
-      pairs = await fetchPairs("https://api.dexscreener.com/latest/dex/search/?q=token")
-    }
+    // 🔥 SORT BY MOMENTUM (KEY)
+    pairs = pairs.sort((a, b) => {
+      const aScore = (a.priceChange?.h1 || 0) + (a.volume?.h24 || 0)
+      const bScore = (b.priceChange?.h1 || 0) + (b.volume?.h24 || 0)
+      return bScore - aScore
+    })
 
-    console.log("RAW PAIRS:", pairs.length)
-
-    // 🔥 CLEAN + SORT
-    pairs = pairs
-      .filter(p => p.priceUsd && p.liquidity?.usd)
-      .sort((a, b) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
+    console.log("RAW PAIRS AFTER FILTER:", pairs.length)
 
     return pairs.slice(0, 50)
 
