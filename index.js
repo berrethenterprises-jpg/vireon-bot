@@ -1,5 +1,5 @@
 // 🚀 FORCE BUILD CONFIRMATION
-console.log("🚀 VIREON v8.8 LIVE BUILD ACTIVE")
+console.log("🚀 VIREON v8.8 STRONG FILTER BUILD ACTIVE")
 
 import { scanTokens } from "./scanner.js"
 import { getBalance, getPositions, openPosition, closePosition, cleanPositions } from "./paperTrader.js"
@@ -27,17 +27,23 @@ async function runBot() {
     for (let token of tokens) {
       if (!token?.priceUsd) continue
 
-      // 🔥 FILTER OUT BASE TOKENS (CRITICAL FIX)
       const symbol = token.baseToken?.symbol
       if (!symbol) continue
 
-      if (
-        symbol === "SOL" ||
-        symbol === "USDC" ||
-        symbol === "USDT"
-      ) continue
+      // 🔥 STRONG FILTER (FINAL VERSION)
+      const banned = ["SOL", "SOLANA", "USDC", "USDT", "ETH", "BTC"]
 
-      console.log("SCANNING:", symbol)
+      // skip base tokens
+      if (banned.includes(symbol)) continue
+
+      // skip high liquidity (not memecoins)
+      const liquidity = token.liquidity?.usd || 0
+      if (liquidity > 5_000_000) continue
+
+      // skip dead/low liquidity junk
+      if (liquidity < 5_000) continue
+
+      console.log("SCANNING:", symbol, "| LIQ:", liquidity)
 
       const clarity = clarityIndex(token)
       const crowd = crowdScore(token)
