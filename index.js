@@ -1,3 +1,6 @@
+// 🔥 FORCE NEW BUILD (DO NOT REMOVE)
+console.log("🚀 VIREON v8.8 NEW BUILD ACTIVE")
+
 import { scanTokens } from "./scanner.js"
 import { getBalance, getPositions, openPosition, closePosition, cleanPositions } from "./paperTrader.js"
 import { clarityIndex, crowdScore, isHighQuality, shouldExit } from "./strategy.js"
@@ -19,7 +22,8 @@ async function runBot() {
   while (true) {
     const tokens = await scanTokens()
 
-    console.log("TOKENS FOUND:", tokens.length)
+    // 🔥 DEBUG: confirm data is coming in
+    console.log("TOKENS RECEIVED:", tokens.length)
 
     for (let token of tokens) {
       if (!token?.priceUsd) continue
