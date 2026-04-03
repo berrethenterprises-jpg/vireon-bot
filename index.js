@@ -19,8 +19,12 @@ async function runBot() {
   while (true) {
     const tokens = await scanTokens()
 
+    console.log("TOKENS FOUND:", tokens.length)
+
     for (let token of tokens) {
       if (!token?.priceUsd) continue
+
+      console.log("SCANNING:", token.baseToken?.symbol)
 
       const clarity = clarityIndex(token)
       const crowd = crowdScore(token)
@@ -33,7 +37,10 @@ async function runBot() {
       openPosition(token, CONFIG.BASE_SIZE)
       activeAddresses.add(token.baseToken.address)
 
-      log("OPEN", token.baseToken.symbol)
+      log("OPEN", {
+        token: token.baseToken.symbol,
+        price: token.priceUsd
+      })
     }
 
     for (let pos of getPositions()) {
@@ -48,13 +55,16 @@ async function runBot() {
 
         activeAddresses.delete(pos.address)
 
-        log("CLOSE", { token: pos.symbol, pnl })
+        log("CLOSE", {
+          token: pos.symbol,
+          pnl: pnl.toFixed(2)
+        })
       }
     }
 
     cleanPositions()
 
-    log("BALANCE", getBalance())
+    log("BALANCE", getBalance().toFixed(2))
 
     await sleep(CONFIG.LOOP_DELAY)
   }
