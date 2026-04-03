@@ -1,4 +1,4 @@
-console.log("🚀 VIREON v9.4 VISIBILITY + FILTER FIX")
+console.log("🚀 VIREON v9.5 REAL TOKEN FIX ACTIVE")
 
 import { scanTokens } from "./scanner.js"
 import { getBalance, getPositions, openPosition, closePosition, cleanPositions } from "./paperTrader.js"
@@ -12,20 +12,36 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+// 🔥 GET THE ACTUAL MEMECOIN (NOT SOL/USDC)
+function getTokenSide(pair) {
+  const base = pair.baseToken
+  const quote = pair.quoteToken
+
+  const baseSymbol = base?.symbol?.toUpperCase() || ""
+  const quoteSymbol = quote?.symbol?.toUpperCase() || ""
+
+  const isBaseStable =
+    baseSymbol.includes("SOL") ||
+    baseSymbol.includes("USD") ||
+    baseSymbol.includes("ETH") ||
+    baseSymbol.includes("BTC")
+
+  const isQuoteStable =
+    quoteSymbol.includes("SOL") ||
+    quoteSymbol.includes("USD") ||
+    quoteSymbol.includes("ETH") ||
+    quoteSymbol.includes("BTC")
+
+  // 🔥 choose the NON-stable side
+  if (isBaseStable && !isQuoteStable) return quote
+  if (!isBaseStable && isQuoteStable) return base
+
+  return base // fallback
+}
+
 function getLivePrice(address, tokens) {
   const t = tokens.find(t => t.baseToken.address === address)
   return t?.priceUsd || null
-}
-
-function isBaseToken(symbol) {
-  const s = symbol.toUpperCase()
-
-  return (
-    s.includes("SOL") ||
-    s.includes("USD") ||
-    s.includes("ETH") ||
-    s.includes("BTC")
-  )
 }
 
 async function runBot() {
@@ -34,34 +50,37 @@ async function runBot() {
 
     console.log("TOKENS RECEIVED:", tokens.length)
 
-    for (let token of tokens) {
-      const symbol = token.baseToken?.symbol || "UNKNOWN"
-      const liquidity = token.liquidity?.usd || 0
+    for (let pair of tokens) {
+      const token = getTokenSide(pair)
 
-      // 🔥 ALWAYS LOG FIRST (CRITICAL)
+      const symbol = token?.symbol || "UNKNOWN"
+      const liquidity = pair.liquidity?.usd || 0
+
       console.log("RAW TOKEN:", symbol, "| LIQ:", liquidity)
 
-      // 🚫 FILTER BASE TOKENS (FUZZY)
-      if (isBaseToken(symbol)) continue
+      if (!symbol) continue
 
-      // 🚫 LIQUIDITY FILTER
       if (liquidity < 1000) continue
       if (liquidity > 5_000_000) continue
 
-      console.log("SCANNING:", symbol, "| LIQ:", liquidity)
+      console.log("SCANNING:", symbol)
 
-      if (!token.priceUsd) continue
-      if (!shouldEnter(token)) continue
+      if (!pair.priceUsd) continue
+      if (!shouldEnter(pair)) continue
 
       if (getPositions().length >= CONFIG.MAX_OPEN_TRADES) continue
-      if (activeAddresses.has(token.baseToken.address)) continue
+      if (activeAddresses.has(token.address)) continue
 
-      openPosition(token, CONFIG.BASE_SIZE)
-      activeAddresses.add(token.baseToken.address)
+      openPosition({
+        ...pair,
+        baseToken: token
+      }, CONFIG.BASE_SIZE)
+
+      activeAddresses.add(token.address)
 
       log("OPEN", {
         token: symbol,
-        price: token.priceUsd
+        price: pair.priceUsd
       })
     }
 
