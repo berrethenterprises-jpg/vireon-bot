@@ -1,4 +1,4 @@
-console.log("🚀 VIREON v9.2 HYBRID ENGINE ACTIVE")
+console.log("🚀 VIREON v9.3 FINAL UNLOCK ACTIVE")
 
 import { scanTokens } from "./scanner.js"
 import { getBalance, getPositions, openPosition, closePosition, cleanPositions } from "./paperTrader.js"
@@ -24,8 +24,6 @@ async function runBot() {
     console.log("TOKENS RECEIVED:", tokens.length)
 
     for (let token of tokens) {
-      if (!token?.priceUsd) continue
-
       const symbol = token.baseToken?.symbol
       if (!symbol) continue
 
@@ -37,8 +35,11 @@ async function runBot() {
       if (liquidity < 1000) continue
       if (liquidity > 5_000_000) continue
 
-      // 🔥 ALWAYS LOG NOW (CRITICAL FOR DEBUG)
+      // 🔥 LOG EVERYTHING THAT PASSES FILTER
       console.log("SCANNING:", symbol, "| LIQ:", liquidity)
+
+      // 🔥 ONLY REQUIRE PRICE WHEN ENTERING
+      if (!token.priceUsd) continue
 
       if (!shouldEnter(token)) continue
 
