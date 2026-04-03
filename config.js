@@ -1,0 +1,7 @@
+export const CONFIG = {
+  BASE_SIZE: 100,
+  MAX_OPEN_TRADES: 5,
+  LOOP_DELAY: 3000,
+  SLIPPAGE: 0.02,
+  FEE: 0.005
+}
