@@ -4,4 +4,4 @@ export const CONFIG = {
   LOOP_DELAY: 3000,
   SLIPPAGE: 0.02,
   FEE: 0.005
-}
+} 
