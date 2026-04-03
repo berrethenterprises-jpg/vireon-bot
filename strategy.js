@@ -9,33 +9,20 @@ export function analyzeMomentum(token) {
 
   return {
     strong: priceChange > 5 && buyPressure && volumeStrong,
-    moderate: priceChange > 1 && buys > sells,
-    strength: priceChange + (buys - sells)
+    moderate: priceChange > 1 && buys > sells
   }
 }
 
 export function shouldEnter(token) {
   const m = analyzeMomentum(token)
-
-  // 🔥 Tier 1 (strong)
-  if (m.strong) return true
-
-  // 🔥 Tier 2 (emerging momentum)
-  if (m.moderate) return true
-
-  return false
+  return m.strong || m.moderate
 }
 
 export function shouldExit(pos, token, elapsed) {
   const gain = token.priceUsd / pos.entry
 
-  // cut losers fast
   if (elapsed > 120000 && gain < 1.03) return true
-
-  // let winners run
   if (gain > 1.3 && elapsed < 600000) return false
-
-  // time exit
   if (elapsed > 600000) return true
 
   return false
