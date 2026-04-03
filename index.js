@@ -1,5 +1,5 @@
-// 🔥 FORCE NEW BUILD (DO NOT REMOVE)
-console.log("🚀 VIREON v8.8 NEW BUILD ACTIVE")
+// 🚀 FORCE BUILD CONFIRMATION
+console.log("🚀 VIREON v8.8 LIVE BUILD ACTIVE")
 
 import { scanTokens } from "./scanner.js"
 import { getBalance, getPositions, openPosition, closePosition, cleanPositions } from "./paperTrader.js"
@@ -10,7 +10,7 @@ import { CONFIG } from "./config.js"
 const activeAddresses = new Set()
 
 function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms))
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 function getLivePrice(address, tokens) {
@@ -22,13 +22,22 @@ async function runBot() {
   while (true) {
     const tokens = await scanTokens()
 
-    // 🔥 DEBUG: confirm data is coming in
     console.log("TOKENS RECEIVED:", tokens.length)
 
     for (let token of tokens) {
       if (!token?.priceUsd) continue
 
-      console.log("SCANNING:", token.baseToken?.symbol)
+      // 🔥 FILTER OUT BASE TOKENS (CRITICAL FIX)
+      const symbol = token.baseToken?.symbol
+      if (!symbol) continue
+
+      if (
+        symbol === "SOL" ||
+        symbol === "USDC" ||
+        symbol === "USDT"
+      ) continue
+
+      console.log("SCANNING:", symbol)
 
       const clarity = clarityIndex(token)
       const crowd = crowdScore(token)
@@ -42,7 +51,7 @@ async function runBot() {
       activeAddresses.add(token.baseToken.address)
 
       log("OPEN", {
-        token: token.baseToken.symbol,
+        token: symbol,
         price: token.priceUsd
       })
     }
