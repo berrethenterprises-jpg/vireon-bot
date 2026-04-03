@@ -1,9 +1,8 @@
-// 🚀 BUILD CONFIRMATION
-console.log("🚀 VIREON v9.0 ACTIVATION MODE")
+console.log("🚀 VIREON v9.2 HYBRID ENGINE ACTIVE")
 
 import { scanTokens } from "./scanner.js"
 import { getBalance, getPositions, openPosition, closePosition, cleanPositions } from "./paperTrader.js"
-import { clarityIndex, crowdScore, shouldExit } from "./strategy.js"
+import { shouldEnter, shouldExit } from "./strategy.js"
 import { log } from "./logger.js"
 import { CONFIG } from "./config.js"
 
@@ -30,23 +29,18 @@ async function runBot() {
       const symbol = token.baseToken?.symbol
       if (!symbol) continue
 
-      // 🚫 BLOCK BASE TOKENS
       const banned = ["SOL", "SOLANA", "USDC", "USDT", "ETH", "BTC"]
       if (banned.includes(symbol)) continue
 
       const liquidity = token.liquidity?.usd || 0
 
-      // 🔥 MUCH WIDER RANGE (ACTIVATION MODE)
       if (liquidity < 1000) continue
-      if (liquidity > 10_000_000) continue
+      if (liquidity > 5_000_000) continue
 
+      // 🔥 ALWAYS LOG NOW (CRITICAL FOR DEBUG)
       console.log("SCANNING:", symbol, "| LIQ:", liquidity)
 
-      const clarity = clarityIndex(token)
-      const crowd = crowdScore(token)
-
-      // 🔥 VERY LOOSE ENTRY (TEMPORARY)
-      if (clarity < 0) continue
+      if (!shouldEnter(token)) continue
 
       if (getPositions().length >= CONFIG.MAX_OPEN_TRADES) continue
       if (activeAddresses.has(token.baseToken.address)) continue
