@@ -16,19 +16,15 @@ export async function scanTokens() {
 
     console.log("RAW PAIRS:", pairs.length)
 
-    // 🔥 FILTER OUT BASE TOKENS + KEEP MEMECOINS
+    // 🔥 ONLY FILTER BY QUALITY (NOT SYMBOL)
     pairs = pairs.filter(p => {
-      const symbol = p.baseToken?.symbol || ""
       const liq = p.liquidity?.usd || 0
+      const vol = p.volume?.h24 || 0
 
-      const isBase =
-        symbol.toUpperCase().includes("SOL") ||
-        symbol.toUpperCase().includes("USD") ||
-        symbol.toUpperCase().includes("ETH") ||
-        symbol.toUpperCase().includes("BTC")
-
-      return !isBase && liq > 1000
+      return liq > 2000 && vol > 5000
     })
+
+    console.log("FILTERED PAIRS:", pairs.length)
 
     // 🔥 SORT BY MOMENTUM
     pairs = pairs.sort((a, b) => {
@@ -36,8 +32,6 @@ export async function scanTokens() {
       const bScore = (b.priceChange?.h1 || 0) + (b.volume?.h24 || 0)
       return bScore - aScore
     })
-
-    console.log("FILTERED PAIRS:", pairs.length)
 
     return pairs.slice(0, 50)
 
