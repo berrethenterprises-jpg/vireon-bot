@@ -16,17 +16,27 @@ export async function scanTokens() {
 
     console.log("RAW PAIRS:", pairs.length)
 
-    // ✅ QUALITY FILTER ONLY
+    // 🔥 MEMECOIN FILTER
     pairs = pairs.filter(p => {
       const liq = p.liquidity?.usd || 0
       const vol = p.volume?.h24 || 0
+      const fdv = p.fdv || 0
 
-      return liq > 2000 && vol > 5000
+      // 🚫 Remove big caps / non-meme
+      if (fdv > 50_000_000) return false
+
+      // 🚫 Remove dead tokens
+      if (liq < 3000) return false
+
+      // 🚫 Remove no activity
+      if (vol < 10000) return false
+
+      return true
     })
 
     console.log("FILTERED PAIRS:", pairs.length)
 
-    // ✅ SORT BY MOMENTUM
+    // 🔥 SORT BY MOMENTUM
     pairs.sort((a, b) => {
       const aScore = (a.priceChange?.h1 || 0) + (a.volume?.h24 || 0)
       const bScore = (b.priceChange?.h1 || 0) + (b.volume?.h24 || 0)
