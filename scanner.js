@@ -16,7 +16,7 @@ export async function scanTokens() {
 
     console.log("RAW PAIRS:", pairs.length)
 
-    // 🔥 ONLY FILTER BY QUALITY (NOT SYMBOL)
+    // ✅ QUALITY FILTER ONLY
     pairs = pairs.filter(p => {
       const liq = p.liquidity?.usd || 0
       const vol = p.volume?.h24 || 0
@@ -26,8 +26,8 @@ export async function scanTokens() {
 
     console.log("FILTERED PAIRS:", pairs.length)
 
-    // 🔥 SORT BY MOMENTUM
-    pairs = pairs.sort((a, b) => {
+    // ✅ SORT BY MOMENTUM
+    pairs.sort((a, b) => {
       const aScore = (a.priceChange?.h1 || 0) + (a.volume?.h24 || 0)
       const bScore = (b.priceChange?.h1 || 0) + (b.volume?.h24 || 0)
       return bScore - aScore
