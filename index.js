@@ -1,121 +1,165 @@
-console.log("🚀 VIREON v9.6 LIVE")
+console.log("🚀 VIREON v20.7 MAX STABILITY")
 
 import { scanTokens } from "./scanner.js"
-import { getBalance, getPositions, openPosition, closePosition, cleanPositions } from "./paperTrader.js"
-import { shouldEnter, shouldExit } from "./strategy.js"
+import {
+  getBalance,
+  getPositions,
+  openPosition,
+  closePosition,
+  cleanPositions
+} from "./paperTrader.js"
+
+import {
+  scoreToken,
+  shouldConsider,
+  shouldExit,
+  shouldTakePartial,
+  getEntrySize
+} from "./strategy.js"
+
 import { log } from "./logger.js"
 import { CONFIG } from "./config.js"
 
-const activeAddresses = new Set()
+const MAX_CAPITAL_USAGE = 0.5
+const MAX_TRADE_SHARE = 0.25
+const START_BALANCE = 1000
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+const confirmationCache = new Map()
+const cooldown = new Map()
+
+function now() {
+  return Date.now()
 }
 
-// ✅ SMART TOKEN PICKER (FIXES USDC/SOL ISSUE)
-function getTokenSide(pair) {
-  const base = pair.baseToken
-  const quote = pair.quoteToken
-
-  const baseSymbol = base?.symbol?.toUpperCase() || ""
-  const quoteSymbol = quote?.symbol?.toUpperCase() || ""
-
-  const isStable = (s) =>
-    s.includes("SOL") ||
-    s.includes("USD") ||
-    s.includes("ETH") ||
-    s.includes("BTC")
-
-  const baseStable = isStable(baseSymbol)
-  const quoteStable = isStable(quoteSymbol)
-
-  // Case 1: one side is stable → pick the other
-  if (baseStable && !quoteStable) return quote
-  if (!baseStable && quoteStable) return base
-
-  // Case 2: both are stable → skip
-  if (baseStable && quoteStable) return null
-
-  // Case 3: both non-stable → default to base
-  return base
+// 🧹 Cleanup maps
+function cleanup(map, ttl) {
+  const cutoff = now() - ttl
+  for (let [k, v] of map) {
+    if (v < cutoff) map.delete(k)
+  }
 }
 
-// ✅ GET LIVE PRICE FOR OPEN POSITIONS
-function getLivePrice(address, tokens) {
-  const t = tokens.find(t => {
-    const token = getTokenSide(t)
-    return token?.address === address
-  })
-  return t?.priceUsd || null
+// 💰 Capital tracking
+function getUsedCapital() {
+  return getPositions().reduce((s, p) => s + p.size, 0)
 }
 
-async function runBot() {
+async function run() {
   while (true) {
-    const tokens = await scanTokens()
+    cleanup(cooldown, 300000)
 
-    console.log("TOKENS RECEIVED:", tokens.length)
+    const pairs = await scanTokens()
 
-    for (let pair of tokens) {
-      const token = getTokenSide(pair)
-      if (!token) continue
+    // ⚠️ API failure handling
+    if (!pairs.length) {
+      await new Promise(r => setTimeout(r, 3000))
+      continue
+    }
 
-      const symbol = token.symbol || "UNKNOWN"
-      const liquidity = pair.liquidity?.usd || 0
+    const balance = getBalance()
+    const maxCapital = balance * MAX_CAPITAL_USAGE
 
-      console.log("RAW TOKEN:", symbol, "| LIQ:", liquidity)
+    // ⚡ Fast pre-filter
+    let valid = pairs.filter(p => shouldConsider(p)).slice(0, 25)
 
-      // ✅ BASIC LIQUIDITY FILTER
-      if (liquidity < 1000) continue
-      if (liquidity > 5_000_000) continue
+    let ranked = valid.map((p, i) => ({
+      pair: p,
+      id: `${p.baseToken.address}-${i}`,
+      score: scoreToken(p)
+    }))
 
-      console.log("SCANNING:", symbol)
+    // 🧠 Regime filter (avg score)
+    const avgScore =
+      ranked.reduce((s, r) => s + r.score, 0) / (ranked.length || 1)
 
-      // ✅ REQUIRE PRICE + STRATEGY
-      if (!pair.priceUsd) continue
-      if (!shouldEnter(pair)) continue
+    if (avgScore < 50) {
+      await new Promise(r => setTimeout(r, 2000))
+      continue
+    }
 
-      // ✅ POSITION LIMIT
-      if (getPositions().length >= CONFIG.MAX_OPEN_TRADES) continue
+    // 🔥 Sort best → worst
+    ranked.sort((a, b) => b.score - a.score)
 
-      // ✅ PREVENT DUPLICATES
-      if (activeAddresses.has(token.address)) continue
+    for (let i = 0; i < ranked.length; i++) {
+      const { pair } = ranked[i]
+      const token = pair.baseToken
+      const key = token.address
 
-      // ✅ OPEN TRADE
-      openPosition(
-        {
-          ...pair,
-          baseToken: token
-        },
-        CONFIG.BASE_SIZE
-      )
+      // ⛔ Cooldown
+      if (cooldown.get(key) > now()) continue
 
-      activeAddresses.add(token.address)
+      // 🧠 Confirmation logic (time-separated)
+      const prev = confirmationCache.get(key) || { count: 0, time: 0 }
+
+      if (now() - prev.time < 500) {
+        confirmationCache.set(key, {
+          count: prev.count + 1,
+          time: now()
+        })
+      } else {
+        confirmationCache.set(key, { count: 1, time: now() })
+        continue
+      }
+
+      if (confirmationCache.get(key).count < 2) continue
+
+      // 💰 Capital recalc (CRITICAL FIX)
+      let used = getUsedCapital()
+      if (used >= maxCapital) break
+
+      let size = getEntrySize(pair, CONFIG.BASE_SIZE, i)
+
+      // 🛡 Max per trade cap
+      const maxTrade = balance * MAX_TRADE_SHARE
+      if (size > maxTrade) size = maxTrade
+
+      const remaining = maxCapital - used
+      if (size > remaining) size = remaining
+
+      // 🛑 Minimum size
+      if (size < balance * 0.01) continue
+
+      openPosition({ ...pair }, size)
+
+      cooldown.set(key, now() + 180000)
 
       log("OPEN", {
-        token: symbol,
-        price: pair.priceUsd
+        token: token.symbol,
+        size,
+        rank: i
       })
     }
 
-    // ✅ MANAGE OPEN POSITIONS
     for (let pos of getPositions()) {
-      const currentPrice = getLivePrice(pos.address, tokens)
-      if (!currentPrice) continue
+      const fresh = pairs.find(p => p.baseToken.address === pos.address)
+      if (!fresh) continue
 
-      const elapsed = Date.now() - pos.start
+      const price = fresh.priceUsd * 0.995 // slippage buffer
+      const elapsed = now() - pos.start
+      const gain = price / pos.entry
 
-      if (shouldExit(pos, { priceUsd: currentPrice }, elapsed)) {
-        const adjustedPrice =
-          currentPrice * (1 - CONFIG.SLIPPAGE - CONFIG.FEE)
+      // 💰 Partial (safe)
+      if (!pos.partialTaken && shouldTakePartial(pos, { priceUsd: price })) {
+        const portion = gain > 1.6 ? 0.3 : 0.5
 
-        const pnl = closePosition(pos, adjustedPrice)
+        closePosition(
+          { ...pos, size: pos.size * portion },
+          price
+        )
 
-        activeAddresses.delete(pos.address)
+        pos.partialTaken = true
+        continue
+      }
 
-        log("CLOSE", {
-          token: pos.symbol,
-          pnl: pnl.toFixed(2)
-        })
+      // 🔴 Early kill
+      if (elapsed > 60000 && gain < 1.03) {
+        closePosition(pos, price)
+        continue
+      }
+
+      // 🔴 Main exit
+      if (shouldExit(pos, { priceUsd: price }, elapsed)) {
+        closePosition(pos, price)
       }
     }
 
@@ -123,8 +167,8 @@ async function runBot() {
 
     log("BALANCE", getBalance().toFixed(2))
 
-    await sleep(CONFIG.LOOP_DELAY)
+    await new Promise(r => setTimeout(r, 1200))
   }
 }
 
-runBot()
+run()
