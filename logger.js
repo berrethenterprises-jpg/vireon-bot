@@ -1,3 +1,3 @@
-export function log(msg, data = "") {
-  console.log(`[${new Date().toISOString()}] ${msg}`, data)
+export function log(type, data) {
+  console.log(`[${type}]`, JSON.stringify(data))
 }
